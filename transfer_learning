@@ -1,0 +1,150 @@
+from keras.preprocessing.image import ImageDataGenerator, img_to_array, load_img
+from keras.models import Sequential
+from keras.layers import Dense
+from keras.applications.vgg16 import VGG16
+import matplotlib.pyplot as plt
+from glob import glob
+
+train_path = "fruits-360/Training/" 
+test_path = "fruits-360/Test/"
+
+#İlk olarak fruits-360 dosyası içerisinde training ve test olrak bulunan iki doyanın yolu verildi.
+
+img = load_img(train_path + "Avocado/0_100.jpg")
+plt.imshow(img)
+plt.axis("off")
+plt.show()
+
+#Training içerisinde bulunan Avocado dosyasındaki 0_100.jpg meyvesi görüntülendi.
+
+x = img_to_array(img)
+print(x.shape)
+
+#image array olarak tutuldu ve shape yazdırıldı.
+
+numberOfClass = len(glob(train_path+"/*"))
+
+#Training içerisindeki tüm dosyalar gezilerek farklı dosya isimleri numberOfClass'a atıldı böylece 
+#kaç farklı class olduğu öğrenildi.
+
+vgg = VGG16() #V Kerasta default olarak bulunan VGG16 modeli alındı.
+
+print(vgg.summary())
+print(type(vgg)) 
+
+vgg_layer_list = vgg.layers #vgg layerları yazdırıldı.
+print(vgg_layer_list)
+
+model = Sequential()
+for i in range(len(vgg_layer_list)-1): 
+    model.add(vgg_layer_list[i])
+    
+#vgg layerlarından en sonuncusunu alınmadı
+#diğerlerini modele alındı.
+
+print(model.summary()) 
+#model bilgisi getirildi
+
+for layers in model.layers:      
+      layers.trainable = False
+      
+#Model layerlarında weight değerlerini yeniden train edilmesine gerek yoktur.
+ #Çünkü model eğitilirken weight değerleri zaten optime edilmiştir yeniden eğitmeye gerek yoktur.
+
+
+
+model.add(Dense(numberOfClass, activation="softmax")) 
+#output layer eklendi.
+#sadece son layer weight değerleri eğitilecek. 
+#Dense metodu ile eklenen node sayısının numberOfClass olduğuna dikkat ediniz.
+
+print(model.summary())
+
+model.compile(loss = "categorical_crossentropy",
+              optimizer = "rmsprop",
+              metrics = ["accuracy"])
+#şu ana kadar önceden eğitilmiş VGG layerlarını alındı sonuncu layerı eklendi.
+#loss metodu, optimizer metodu verildi.
+
+# train  
+train_data = ImageDataGenerator().flow_from_directory(train_path,target_size = (224,224))
+test_data = ImageDataGenerator().flow_from_directory(test_path,target_size = (224,224))
+# VGG (224,224) boyutundaki görüntüler içeren ImageNet görüntüleri ile eğitilmiş bir modeldir. 
+#Bu sebeple (224,224) boyutunda input değerleri ister.
+
+
+batch_size = 32
+
+hist = model.fit_generator(train_data,
+                           steps_per_epoch=1600//batch_size,
+                           epochs= 25,
+                           validation_data=test_data,
+                           validation_steps= 800//batch_size)
+
+#Model fit edilmiştir.
+
+#%%
+model.save_weights("deneme.h5") 
+#ileride weights değerlerini görmek için deneme.h5 olarak kaydedilmiştir.
+
+#%% evaluation
+print(hist.history.keys())
+plt.plot(hist.history["loss"],label = "training loss")
+plt.plot(hist.history["val_loss"],label = "validation loss")
+plt.legend()
+plt.show()
+plt.figure()
+plt.plot(hist.history["acc"],label = "training acc")
+plt.plot(hist.history["val_acc"],label = "validation acc")
+plt.legend()
+plt.show()
+
+#eğitim içinde loss değerleri ve accuracy değerleri plot ettirilmiştir.
+#%% save history
+import json, codecs
+with open("deneme.json","w") as f:  #(transfer_learning_fruit_hist.json)
+    json.dump(hist.history,f)
+    
+#Model kayddedildi.
+#%% load history
+with codecs.open("transfer_learning_fruit_hist.json","r",encoding = "utf-8") as f:
+    n = json.loads(f.read())
+
+plt.plot(n["loss"],label = "training loss")
+plt.plot(n["val_loss"],label = "validation loss")
+plt.legend()
+plt.show()
+plt.figure()
+plt.plot(n["acc"],label = "training acc")
+plt.plot(n["val_acc"],label = "validation acc")
+plt.legend()
+plt.show()
+
+#Kaydedilen model transfer_learning_fruit_hist.json load edilmiştir.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
